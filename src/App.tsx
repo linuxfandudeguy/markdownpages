@@ -1,117 +1,93 @@
-import { useState, useEffect } from 'react';
-import { marked } from 'marked'; // Import marked for markdown rendering
-import katex from 'katex';
-import DOMPurify from 'dompurify'; // Import DOMPurify for sanitizing HTML
-import hljs from 'highlight.js'; // Import highlight.js for syntax highlighting
+import React, { useState, useEffect } from 'react';
+import ErrorBoundary from './ErrorBoundary';
 import 'katex/dist/katex.min.css';
-import 'bootstrap/dist/css/bootstrap.min.css'; // Always include Bootstrap CSS
-import 'highlight.js/styles/monokai.css'; // Import the monokai dark theme for highlight.js
-import ErrorBoundary from './ErrorBoundary'; // Import the ErrorBoundary
+import 'bootstrap/dist/css/bootstrap.min.css';
+import 'highlight.js/styles/monokai.css';
+import DOMPurify from 'dompurify';
+
+let marked: any;
+let katex: any;
+let hljs: any;
 
 const App = () => {
-  const [content, setContent] = useState<string>(''); // State for markdown content
-  const [renderedHtml, setRenderedHtml] = useState<string>(''); // State for rendered HTML
-  const [generatedUrl, setGeneratedUrl] = useState<string>(''); // State for generated URL
-  const [isViewMode, setIsViewMode] = useState<boolean>(false); // State to check if in view-only mode
-  const [errorMessage, setErrorMessage] = useState<string>(''); // State for the error message
+  const [content, setContent] = useState<string>('');
+  const [renderedHtml, setRenderedHtml] = useState<string>('');
+  const [generatedUrl, setGeneratedUrl] = useState<string>('');
+  const [isViewMode, setIsViewMode] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
-  // Global error handler for unhandled JavaScript errors
+  // Dynamically import large libraries only when necessary
   useEffect(() => {
-    const handleError = (event: any, source: string, lineno: number, colno: number, error: Error) => {
-      const errorDetails = `${error.message} at ${source}:${lineno}:${colno}`;
-      setErrorMessage(errorDetails); // Display the actual error message in the UI
-      console.error(errorDetails);
-      return true; // Prevent default handling (e.g., browser-specific error dialogs)
+    const loadLibraries = async () => {
+      if (!marked) marked = (await import('marked')).default;
+      if (!katex) katex = (await import('katex')).default;
+      if (!hljs) hljs = (await import('highlight.js')).default;
     };
 
-    window.onerror = handleError;
+    loadLibraries();
+  }, []); // Empty dependency array means it will run once after mount
 
-    return () => {
-      window.onerror = null; // Clean up error handler on component unmount
-    };
-  }, []);
-
-  // Fetch Base64 encoded content from the URL
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const base64Content = urlParams.get('content');
-    
-    if (base64Content) {
-      try {
-        const decodedContent = atob(base64Content); // Decode the Base64 content
-        setContent(decodedContent); // Set content from URL
-        setIsViewMode(true); // Set to view-only mode if content parameter exists
-      } catch (error) {
-        // If decoding fails, set error state
-        setErrorMessage(`Failed to decode content from URL: ${error.message}`);
-        setContent(''); // Clear content to ensure error state is shown
-      }
-    }
-  }, []);
-
-  // Function to render markdown with KaTeX support and syntax highlighting
-  const renderMarkdown = (md: string) => {
+  const renderMarkdown = (md: string): string => {
     try {
-      let htmlContent = marked(md); // Render the Markdown using marked
+      if (!marked || !katex || !DOMPurify) return ''; // Ensure libraries are loaded
+      let htmlContent = marked(md); // Render markdown
 
-      // Render KaTeX math expressions
-      htmlContent = htmlContent.replace(/(\$.*?\$)/g, (match) => {
-        try {
-          return katex.renderToString(match.slice(1, -1)); // Remove $ symbols for KaTeX
-        } catch (err) {
-          return match; // Return original if KaTeX fails
-        }
-      });
+      if (typeof htmlContent === 'string') {
+        htmlContent = htmlContent.replace(/(\$.*?\$)/g, (match: string) => {
+          try {
+            return katex.renderToString(match.slice(1, -1));
+          } catch (err) {
+            return match; // Return original if KaTeX fails
+          }
+        });
 
-      // Sanitize the HTML content to avoid XSS vulnerabilities
-      const sanitizedHtml = DOMPurify.sanitize(htmlContent);
-
-      return sanitizedHtml; // Return sanitized HTML content
+        const sanitizedHtml = DOMPurify.sanitize(htmlContent);
+        return sanitizedHtml; // Return sanitized HTML content
+      } else {
+        throw new Error('Rendered markdown is not a string.');
+      }
     } catch (error) {
-      // If rendering markdown fails, set error state
-      setErrorMessage(`Error rendering the markdown: ${error.message}`);
-      return ""; // Return empty string if error occurs
+      if (error instanceof Error) {
+        setErrorMessage(`Error rendering the markdown: ${error.message}`);
+      }
+      return ''; // Return empty string if there's an error
     }
   };
 
-  // Update the rendered HTML when content changes
+  // Update the rendered HTML directly
   useEffect(() => {
     if (content && !errorMessage) {
-      setRenderedHtml(renderMarkdown(content));
+      const htmlContent = renderMarkdown(content);
+      setRenderedHtml(htmlContent);
     }
-  }, [content, errorMessage]); // Avoid rendering if errorMessage is set
+  }, [content, errorMessage]);
 
-  // Generate Base64 URL with markdown content
   const generateUrl = () => {
-    const base64Content = btoa(content); // Base64 encode the content
+    const base64Content = btoa(content);
     const newUrl = `${window.location.origin}?content=${base64Content}`;
     setGeneratedUrl(newUrl);
   };
 
-  // Function to apply syntax highlighting
   const applySyntaxHighlighting = () => {
-    // Highlight all <code> blocks in the rendered HTML
-    document.querySelectorAll('pre code').forEach((block) => {
-      hljs.highlightElement(block as HTMLElement); // Apply highlighting
-    });
+    if (hljs) {
+      document.querySelectorAll('pre code').forEach((block) => {
+        hljs.highlightElement(block as HTMLElement);
+      });
+    }
   };
 
-  // Trigger syntax highlighting after the HTML is rendered
   useEffect(() => {
     if (renderedHtml) {
       applySyntaxHighlighting();
     }
-  }, [renderedHtml]); // Run on renderedHtml change
+  }, [renderedHtml]);
 
-  // If there is an error message, we show the error page with the error message in a <pre> tag
   if (errorMessage) {
     return (
       <ErrorBoundary>
         <div className="container text-center" style={{ padding: '50px' }}>
           <h1>Oops! Something went wrong.</h1>
-          <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', textAlign: 'left' }}>
-            {errorMessage}
-          </pre>
+          <pre>{errorMessage}</pre>
         </div>
       </ErrorBoundary>
     );
@@ -128,16 +104,17 @@ const App = () => {
               Please note: This is for documentation purposes only, and you are not allowed to modify the CSS.
             </p>
 
-            {/* Show Available Functions */}
             <div className="alert alert-info">
-              <h5>Special Functions:</h5>
+              <h5>Available Functions:</h5>
               <ul>
                 <li><strong>Code Blocks:</strong> Use <code>` ```code here``` `</code> to add code blocks.</li>
-                <li><strong>Math Expressions:</strong> Use <code>`$E = mc^2$`</code> for equations.</li>
+                <li><strong>Math Expressions:</strong> Use <code>`$E = mc^2$`</code> for inline equations, or <code>`$$E = mc^2$$`</code> for block equations.</li>
+                <li><strong>Links:</strong> Use <code>`[Link Text](http://url.com)`</code> to add links.</li>
+                <li><strong>Images:</strong> Use <code>`![Alt Text](http://url.com)`</code> to add images.</li>
+                <li><strong>Lists:</strong> Use <code>`- Item`</code> or <code>`1. Item`</code> for unordered and ordered lists.</li>
               </ul>
             </div>
 
-            {/* Markdown Editor */}
             <div className="card mt-4">
               <div className="card-body">
                 <h5 className="card-title">Markdown Editor</h5>
@@ -145,40 +122,30 @@ const App = () => {
                   className="form-control"
                   rows={10}
                   value={content}
-                  onChange={(e) => setContent(e.target.value)} // Update content state on change
+                  onChange={(e) => setContent(e.target.value)}
                 ></textarea>
               </div>
             </div>
 
-            {/* Rendered Content */}
             <div className="card mt-4">
               <div className="card-body">
                 <h5 className="card-title">Rendered Page</h5>
-                {/* Directly render the content inside the container */}
-                <div className="markdown-output" dangerouslySetInnerHTML={{ __html: renderedHtml }} />
+                <div dangerouslySetInnerHTML={{ __html: renderedHtml }} />
               </div>
             </div>
 
-            {/* URL Generation */}
-            <div className="card mt-4">
-              <div className="card-body">
-                <h5 className="card-title">Generated URL</h5>
-                <p className="text-muted">Click the button below to generate the Base64 encoded URL for your content:</p>
-                <button className="btn btn-primary" onClick={generateUrl}>
-                  Generate URL
-                </button>
-                {generatedUrl && (
-                  <div className="mt-3">
-                    <p><strong>Share this URL:</strong></p>
-                    <a href={generatedUrl} target="_blank" rel="noopener noreferrer">{generatedUrl}</a>
-                  </div>
-                )}
+            <button className="btn btn-primary mt-4" onClick={generateUrl}>
+              Generate URL
+            </button>
+            {generatedUrl && (
+              <div className="mt-3">
+                <h5>Share this URL:</h5>
+                <input type="text" className="form-control" value={generatedUrl} readOnly />
               </div>
-            </div>
+            )}
           </>
         ) : (
-          // Render the page content directly if content is passed via the URL
-          <div className="content markdown-output" style={{ maxWidth: '800px', margin: '0 auto' }}>
+          <div className="mt-5">
             <div dangerouslySetInnerHTML={{ __html: renderedHtml }} />
           </div>
         )}

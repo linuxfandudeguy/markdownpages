@@ -111,13 +111,10 @@ const App = () => {
             </p>
 
             <div className="alert alert-info">
-              <h5>Available Functions:</h5>
+              <h5>Special Functions:</h5>
               <ul>
                 <li><strong>Code Blocks:</strong> Use <code>` ```code here``` `</code> to add code blocks.</li>
-                <li><strong>Math Expressions:</strong> Use <code>`$E = mc^2$`</code> for inline equations, or <code>`$$E = mc^2$$`</code> for block equations.</li>
-                <li><strong>Links:</strong> Use <code>`[Link Text](http://url.com)`</code> to add links.</li>
-                <li><strong>Images:</strong> Use <code>`![Alt Text](http://url.com)`</code> to add images.</li>
-                <li><strong>Lists:</strong> Use <code>`- Item`</code> or <code>`1. Item`</code> for unordered and ordered lists.</li>
+                <li><strong>Math Expressions:</strong> Use <code>`$E = mc^2$`</code> for equations.</li>
               </ul>
             </div>
 

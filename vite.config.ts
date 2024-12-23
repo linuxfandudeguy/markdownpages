@@ -7,11 +7,16 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        // Chunk the large libraries separately from the main bundle
+        // Chunk the libraries separately from the main bundle
         manualChunks: {
-          // Example of chunking large libraries that are often heavy
+          // Chunk React libraries into a separate bundle
           reactVendor: ['react', 'react-dom'],
-          markdown: ['marked', 'katex', 'highlight.js'], // Add libraries that can be split out
+          
+          // Chunk Markdown core libraries (marked and dompurify) together
+          md: ['marked', 'dompurify'],
+          
+          // Chunk Markdown extensions (katex and highlight.js) together
+          mdPlugins: ['katex', 'highlight.js'],
         },
         chunkFileNames: 'chunks/[name]-[hash].js', // Output chunk names with a hash for cache-busting
       },

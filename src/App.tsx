@@ -1,4 +1,6 @@
+// Import the whole React module
 import React, { useState, useEffect } from 'react';
+
 import ErrorBoundary from './ErrorBoundary';
 
 // Static imports for smaller libraries (CSS and lightweight dependencies)
